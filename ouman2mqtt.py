@@ -2,6 +2,7 @@
 from typing import Optional, List, Dict
 
 import asyncio
+import hashlib
 import logging
 
 from ouman_eh800 import OumanEH800
@@ -14,11 +15,20 @@ class EH800(Asyncio2Mqtt):
     def __init__(self, ouman_url: str, ouman_name: str,
                  **kwargs):
         super().__init__(**kwargs)
-        self.ouman = OumanEH800(ouman_url)
+        self.ouman_url = ouman_url
         self.ouman_name = ouman_name
+        self.ouman = OumanEH800(self.ouman_url)
+        self.ha_device_info = {
+            'connections': [['url_hash',hashlib.sha1(bytes(self.ouman_url,'ascii')).hexdigest() ],],
+            'manufacturer': 'Ouman Oy',
+            'model': 'EH-800',
+            'name': self.ouman_name,
+            'suggested_area': 'Boiler Room',
+            'configuration_url': self.ouman_url
+            }
 
-    def poll_data(self) -> Dict:
-        return self.ouman.get_params()
+    async def poll_data(self) -> Dict:
+        return await self.ouman.get_params()
 
     def get_ha_configuration(self) -> Dict:
         state_topic = f'{self.mqtt_topic}/state'
@@ -49,6 +59,7 @@ class EH800(Asyncio2Mqtt):
                 'state_class': 'measurement',
                 'unique_id': ha_uid,
                 'object_id': ha_uid,
+                'device': self.ha_device_info,
             }
             hac.update(dc)
             hac.update(pc.get('ha_cfg', {}))
